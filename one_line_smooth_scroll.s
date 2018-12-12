@@ -7,42 +7,44 @@
 	.byte	0	;end of line
 	.word	0	;end of program
 
-	sei		;set interrupt pointer
-	lda #<int
+	sei		;set interrupt handler
+	lda #<inth
 	sta $0314
-	lda #>int
+	lda #>inth
 	sta $0315
 	cli
 	
-	lda #$7f
-	sta $dc0d	;turn off timer interrupt
-	lda $d011
+	lda $d011	;reset bits 0-8 of raster interrupt line
 	and #%01111111
-	sta $d011	;reset bit 8 of raster interrupt line
+	sta $d011	
 	lda #0
-	sta $d012	;reset bits 0-7 of raster interrupt line
-	lda #1
-	sta $d01a	;enable raster interrupt
+	sta $d012
+	lda #1		;enable raster interrupt
+	sta $d01a
 	rts
 
-int	lda #1
-	sta $d019	;reset raster interrupt bit
+inth	lda $d019	;raster interrupt?
+	and #1
+	bne rint
+	jmp $ea31	;no, skip to default interrupt handler
+	
+rint	sta $d019	;acknowledge raster interrupt
+	
+	lda $d012
+	cmp #58
+	bcc pixscrl
+	
+	lda #%1000	;at raster line 58
+	sta $d016
+	lda #0		;set next interrupt at raster line 0
+	sta $d012
+	jmp $ea81
 
-	lda $d011
-	and #%10000000
-	ora $d012
-	beq pixscrl	;raster line 0?
-
-	lda #0
-	sta $d012	;set next interrupt at raster line 0
-	lda #%1000
-	sta $d016	;reset horizontal screen position
-	jmp $ea31
-
-pixscrl	lda #58
-	sta $d012	;set next interrupt at raster line 58
+pixscrl	lda #58		;set next interrupt at raster line 58
+	sta $d012
 
 	lda scrpos	;smooth scroll
+	sec
 	sbc #1
 	and #%111
 	sta $d016
